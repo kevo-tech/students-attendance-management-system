@@ -1,0 +1,21 @@
+:root{--bg:#f8fafc;--card:#fff;--muted:#6b7280}
+*{box-sizing:border-box}
+.auth-page{min-height:100vh;display:flex;align-items:center;justify-content:center;background:#e6f2ff}
+.auth-form{background:var(--card);padding:28px;border-radius:10px;min-width:360px;box-shadow:0 6px 20px rgba(2,6,23,0.08);text-align:left}
+.auth-form h2{margin:0 0 12px}
+.auth-form label{display:block;margin-bottom:8px}
+.auth-form input{width:100%;padding:8px;margin-top:6px;border:1px solid #e6e9ef;border-radius:6px}
+.auth-form .auth-actions{display:flex;gap:10px;justify-content:center;margin-top:14px}
+.auth-form button{padding:10px 14px;border-radius:8px;border:none;cursor:pointer}
+.auth-form .primary{background:#2563eb;color:#fff}
+.auth-form .secondary{background:transparent;border:1px solid #2563eb;color:#2563eb}
+.auth-form .primary:active,.auth-form .secondary:active{transform:translateY(1px)}
+.auth-form .error{background:#fee2e2;color:#991b1b;padding:8px;border-radius:6px;margin-bottom:8px}
+.app-header{display:flex;justify-content:space-between;align-items:center;padding:12px 18px;background:var(--card);box-shadow:0 1px 2px rgba(16,24,40,0.03)}
+.app-header .brand{font-weight:700;cursor:pointer}
+.dashboard{display:flex;gap:20px;padding:18px}
+.dashboard-left{flex:2}
+.dashboard-right{flex:1}
+.students-table{width:100%;border-collapse:collapse}
+.students-table th{background:#fbfcfd;padding:8px;text-align:left;color:var(--muted)}
+.students-table td{padding:10px;border-bottom:1px solid #f1f3f5}

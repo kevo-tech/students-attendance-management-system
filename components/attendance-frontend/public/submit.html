@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Submit Attendance</title>
+  <style>
+    :root{ --bg:#f0f9ff; --card:#fff; --accent:#0b74de; }
+    html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,Arial;background:var(--bg)}
+    .page{min-height:100%;display:flex;align-items:center;justify-content:center;padding:2rem}
+    .card{width:100%;max-width:520px;background:var(--card);padding:1.25rem;border-radius:10px;box-shadow:0 8px 24px rgba(2,6,23,0.08)}
+    h1{margin:0 0 .5rem 0;font-size:1.25rem}
+    .input{width:100%;padding:.65rem .75rem;border:1px solid #e6eef6;border-radius:8px}
+    .row{display:flex;gap:.5rem}
+    .actions{display:flex;gap:.5rem;margin-top:.75rem}
+    .btn{padding:.65rem .9rem;border-radius:8px;border:0;font-weight:600;background:var(--accent);color:#fff;cursor:pointer}
+    .note{margin-top:.75rem;color:#374151}
+  </style>
+</head>
+<body>
+  <div class="page">
+    <main class="card" role="main">
+      <h1>Submit Attendance</h1>
+      <p class="note">Enter your details below and mark yourself present or absent.</p>
+
+      <form id="attendanceForm" autocomplete="on">
+        <div>
+          <label for="fullName">Full name</label>
+          <input id="fullName" name="fullName" class="input" required placeholder="Jane Doe" />
+        </div>
+        <div>
+          <label for="regNo">Registration number</label>
+          <input id="regNo" name="regNo" class="input" required placeholder="REG-12345" />
+        </div>
+        <div>
+          <label>Status</label>
+          <div class="row" style="margin-top:.5rem">
+            <label><input type="radio" name="status" value="present" checked /> Present</label>
+            <label><input type="radio" name="status" value="absent" /> Absent</label>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button type="submit" class="btn">Submit</button>
+        </div>
+      </form>
+
+      <p class="note">After submission, the lecturer's dashboard will display your attendance.</p>
+    </main>
+  </div>
+
+  <script>
+    (function(){
+      const form = document.getElementById('attendanceForm');
+      form.addEventListener('submit', function(e){
+        e.preventDefault();
+        const nameEl = document.getElementById('fullName');
+        const regEl = document.getElementById('regNo');
+        const name = nameEl && nameEl.value ? String(nameEl.value).trim() : '';
+        const regNo = regEl && regEl.value ? String(regEl.value).trim() : '';
+        const status = document.querySelector('input[name="status"]:checked') ? document.querySelector('input[name="status"]:checked').value : 'present';
+        if(!name || !regNo){
+          alert('Please enter your full name and registration number.');
+          return;
+        }
+
+        // Try sending to API, fallback to localStorage if offline
+        const payload = { name, regNo, status };
+        fetch('http://localhost:4000/api/attendance', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        }).then(r => {
+          if(!r.ok) throw new Error('server error')
+          return r.json()
+        }).then(data => {
+          alert('Attendance submitted — thank you.');
+          form.reset();
+        }).catch(err => {
+          console.warn('API submit failed, falling back to localStorage', err)
+          try{
+            const raw = localStorage.getItem('attendanceRecords');
+            const arr = raw ? JSON.parse(raw) : [];
+            arr.push({ id: Date.now().toString(36), name, regNo, status, ts: new Date().toISOString() });
+            localStorage.setItem('attendanceRecords', JSON.stringify(arr));
+            alert('Attendance saved locally (offline demo).');
+            form.reset();
+          }catch(e){
+            console.error(e); alert('Failed to save attendance.');
+          }
+        })
+      });
+    }());
+  </script>
+</body>
+</html>

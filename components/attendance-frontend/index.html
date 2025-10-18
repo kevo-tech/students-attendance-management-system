@@ -1,0 +1,736 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Lecturer — Attendance Dashboard</title>
+
+  <!-- Poppins font -->
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <!-- qrcodejs -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"></script>
+
+  <style>
+    :root{
+      --bg:#0b1020;
+      --card:#0f1724;
+      --muted:#97a0b5;
+      --accent:#6c5ce7;
+      --accent-2:#00b4d8;
+      --danger:#ef4444;
+      --glass: rgba(255,255,255,0.03);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family:'Poppins',system-ui,-apple-system,Segoe UI,Roboto,'Helvetica Neue',Arial;
+      background: linear-gradient(180deg, #05060a 0%, #081126 50%, #051033 100%);
+      color:#e6eef8;
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+      padding:18px;
+      display:flex;
+      justify-content:center;
+      align-items:flex-start;
+    }
+
+    /* App container */
+    .wrap{
+      width:100%;
+      max-width:1100px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border-radius:14px;
+      box-shadow: 0 12px 40px rgba(2,6,23,0.6);
+      display:grid;
+      grid-template-columns: 360px 1fr;
+      overflow:hidden;
+      min-height:640px;
+    }
+
+    /* left column */
+    .left {
+      padding:20px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0));
+      border-right: 1px solid rgba(255,255,255,0.02);
+      display:flex;
+      flex-direction:column;
+      gap:14px;
+    }
+
+    .brand {
+      display:flex;
+      gap:12px;
+      align-items:center;
+    }
+    .logo {
+      width:56px;height:56px;border-radius:12px;
+      background: linear-gradient(135deg,var(--accent),var(--accent-2));
+      display:flex;align-items:center;justify-content:center;font-weight:700;font-size:20px;color:white;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+    }
+    .brand h1 { margin:0;font-size:18px;line-height:1; }
+    .brand p { margin:0;font-size:12px;color:var(--muted) }
+
+    .card {
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border-radius:12px;padding:12px;border:1px solid rgba(255,255,255,0.02);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.01);
+    }
+
+    label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+    input,select {
+      width:100%;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);
+      background:transparent;color:inherit;font-size:14px;margin-bottom:10px;
+      outline:none;
+    }
+    input::placeholder{color:rgba(230,238,248,0.45)}
+    button.btn{
+      padding:10px 12px;border-radius:10px;border:none;cursor:pointer;font-weight:600;
+      background:linear-gradient(90deg,var(--accent),var(--accent-2)); color:white;
+      box-shadow:0 8px 20px rgba(44,39,94,0.18);
+    }
+    button.ghost {
+      background:transparent;border:1px solid rgba(255,255,255,0.04); color:var(--muted);
+    }
+    .tiny { font-size:12px;color:var(--muted) }
+
+    .muted { color:var(--muted) }
+
+    .roster {
+      max-height:260px;overflow:auto;margin-top:8px;padding:6px;border-radius:8px;border:1px solid rgba(255,255,255,0.02);
+    }
+    .student-item { display:flex;justify-content:space-between;align-items:center;padding:8px;border-radius:8px;margin-bottom:6px;background:linear-gradient(180deg, rgba(255,255,255,0.004), transparent) }
+    .student-item strong{font-weight:600}
+    .student-meta{font-size:12px;color:var(--muted)}
+
+    /* right column */
+    .right { padding:20px; overflow:auto; }
+
+    .header {
+      display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;
+    }
+    .welcome { font-weight:700;font-size:18px }
+    .actions { display:flex;gap:8px;align-items:center }
+
+    .grid {
+      display:grid;grid-template-columns: repeat(2,1fr);gap:12px;margin-bottom:12px;
+    }
+    .full { grid-column:1/-1 }
+
+    .list {
+      background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.005));
+      border-radius:10px;padding:10px;border:1px solid rgba(255,255,255,0.02);
+      max-height:300px;overflow:auto;
+    }
+
+    .list-item { display:flex;justify-content:space-between;align-items:center;padding:10px;border-radius:8px;margin-bottom:8px;background:rgba(255,255,255,0.01) }
+    .status-pres{color:#06d6a0;font-weight:700}
+    .status-abs{color:#ff7a7a;font-weight:700}
+
+    .qr-area { display:flex;flex-direction:column;align-items:center;gap:8px;padding:12px;border-radius:10px;background:rgba(255,255,255,0.01); }
+
+    .controls { display:flex;gap:8px;flex-wrap:wrap }
+
+    .stat { background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.005)); padding:10px;border-radius:10px;text-align:center }
+
+    /* small screens */
+    @media (max-width:920px){
+      .wrap{ grid-template-columns: 1fr; }
+      .left{ order:2 }
+      .right{ order:1 }
+      .grid{ grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <!-- LEFT: auth + roster -->
+  <div class="left">
+    <div class="brand">
+      <div class="logo">LP</div>
+      <div>
+        <h1>Lecturer Portal</h1>
+        <p class="tiny">Generate QR · Track attendance · Export CSV</p>
+      </div>
+    </div>
+
+    <!-- Auth Card -->
+    <div class="card" id="authCard">
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <button id="showLogin" class="btn" style="flex:1">Login</button>
+        <button id="showSignup" class="ghost" style="flex:1">Sign up</button>
+      </div>
+
+      <div id="authForms">
+        <!-- login -->
+        <div id="loginForm">
+          <label>Email</label><input id="lecLoginEmail" placeholder="you@college.edu" type="email">
+          <label>Password</label><input id="lecLoginPassword" placeholder="password" type="password">
+          <div style="display:flex;gap:8px">
+            <button id="signinBtn" class="btn" style="flex:1">Sign in</button>
+            <button id="signoutBtn" class="ghost" style="flex:1;display:none">Sign out</button>
+          </div>
+        </div>
+
+        <!-- signup (hidden by default) -->
+        <div id="signupForm" style="display:none">
+          <label>Full name</label><input id="lecName" placeholder="Dr. Jane Doe">
+          <label>Email</label><input id="lecEmail" type="email" placeholder="you@college.edu">
+          <label>Create password</label><input id="lecPassword" type="password" placeholder="choose a password">
+          <button id="registerBtn" class="btn">Create account</button>
+        </div>
+      </div>
+
+      <div class="tiny" style="margin-top:10px">Signed in as: <span id="signedAs" class="muted">—</span></div>
+    </div>
+
+    <!-- Roster card -->
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div><strong>Class Roster</strong><div class="tiny">Students registered (shared with student page)</div></div>
+        <div><button id="refreshRoster" class="ghost">Refresh</button></div>
+      </div>
+
+      <div style="margin-top:8px">
+        <input id="rosterSearch" placeholder="Search name or reg #" style="padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.02);width:100%;background:transparent;color:inherit">
+      </div>
+
+      <div id="roster" class="roster" style="margin-top:10px"></div>
+
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button id="importDemo" class="ghost" style="flex:1">Seed demo</button>
+        <button id="clearRoster" class="ghost" style="flex:1">Clear roster</button>
+      </div>
+    </div>
+
+    <div class="card tiny">
+      <div><strong>Local storage keys</strong></div>
+      <div class="tiny" style="margin-top:6px">students_v2 · lecturers_v2 · sessions_v2 · active_session</div>
+    </div>
+
+  </div>
+
+  <!-- RIGHT: main dashboard -->
+  <div class="right">
+    <div class="header">
+      <div>
+        <div class="welcome">Attendance Dashboard</div>
+        <div id="sessionInfo" class="tiny muted">No active session</div>
+      </div>
+
+      <div class="actions">
+        <div class="tiny muted" id="clock">—</div>
+        <div style="width:6px"></div>
+        <button id="exportCsv" class="btn">Download CSV</button>
+      </div>
+    </div>
+
+    <div class="grid">
+      <!-- session controls -->
+      <div class="card">
+        <h3 style="margin-top:0">Create session</h3>
+        <div class="tiny">Create a session and generate a QR code students scan</div>
+
+        <label>Course name</label><input id="courseName" placeholder="e.g. Computer Science 101">
+        <label>Room</label><input id="roomName" placeholder="e.g. Room 302">
+        <label>Start time</label><input id="startTime" type="time">
+        <label>End time</label><input id="endTime" type="time">
+
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button id="createSession" class="btn" style="flex:1">Create & Generate QR</button>
+          <button id="endSession" class="ghost" style="flex:1">End Session</button>
+        </div>
+
+        <div style="margin-top:12px" class="qr-area">
+          <div id="qrcode" style="background:transparent;padding:8px;border-radius:8px"></div>
+          <div id="qrPayload" class="tiny muted">QR payload will appear here</div>
+          <div style="display:flex;gap:8px;margin-top:6px">
+            <button id="copyPayload" class="ghost">Copy payload</button>
+            <button id="openScanTip" class="ghost">Open student scan (tip)</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- stats -->
+      <div class="card">
+        <h3 style="margin-top:0">Session stats</h3>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <div class="stat" style="flex:1"><div class="tiny muted">Total Registered</div><div id="statTotal">0</div></div>
+          <div class="stat" style="flex:1"><div class="tiny muted">Present</div><div id="statPresent">0</div></div>
+          <div class="stat" style="flex:1"><div class="tiny muted">Absent</div><div id="statAbsent">0</div></div>
+        </div>
+
+        <div style="margin-top:10px" class="tiny muted">Session history below shows recent sessions and can be viewed or deleted.</div>
+      </div>
+
+      <!-- present list -->
+      <div class="card full">
+        <h3 style="margin-top:0">Present — Students who scanned</h3>
+        <div id="presentList" class="list">
+          <div class="tiny muted">No attendance yet</div>
+        </div>
+      </div>
+
+      <!-- absent list -->
+      <div class="card full">
+        <h3 style="margin-top:0">Absent — Registered but not yet scanned</h3>
+        <div id="absentList" class="list">
+          <div class="tiny muted">No students registered</div>
+        </div>
+      </div>
+
+      <!-- history -->
+      <div class="card full">
+        <h3 style="margin-top:0">Session history</h3>
+        <div id="historyList" class="list">
+          <div class="tiny muted">No sessions yet</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<!-- small modal / tip for student scanning -->
+<div id="tipModal" style="position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(2,6,23,0.6);z-index:999;padding:20px">
+  <div style="background:linear-gradient(180deg,#081226,#0b1230);padding:16px;border-radius:12px;max-width:420px;color:#e6eef8">
+    <div style="display:flex;justify-content:space-between;align-items:center"><strong>Student Scan Tip</strong><button id="closeTip" class="ghost">Close</button></div>
+    <p class="tiny muted" style="margin-top:10px">Open <code>student.html</code> on the student's phone and scan the QR displayed here. The student page reads the QR and writes the attendance to <code>localStorage</code>. This lecturer dashboard listens for localStorage changes and updates in real time.</p>
+  </div>
+</div>
+
+<script>
+/* -------------------------
+   LocalStorage keys & helpers
+   ------------------------- */
+const LS = {
+  students: 'students_v2',       // array of {name,email,reg}
+  lecturers: 'lecturers_v2',     // array of lecturers
+  sessions: 'sessions_v2',       // array of sessions
+  active: 'active_session'       // id of active session
+};
+
+function read(key){ return JSON.parse(localStorage.getItem(key) || '[]'); }
+function write(key,obj){ localStorage.setItem(key, JSON.stringify(obj)); }
+function readObj(key){ return JSON.parse(localStorage.getItem(key) || 'null'); }
+function writeObj(key,obj){ localStorage.setItem(key, JSON.stringify(obj)); }
+function removeKey(key){ localStorage.removeItem(key); }
+
+/* -------------------------
+   DOM bindings
+   ------------------------- */
+const showLogin = document.getElementById('showLogin');
+const showSignup = document.getElementById('showSignup');
+const loginForm = document.getElementById('loginForm');
+const signupForm = document.getElementById('signupForm');
+const signinBtn = document.getElementById('signinBtn');
+const registerBtn = document.getElementById('registerBtn');
+const signoutBtn = document.getElementById('signoutBtn');
+
+const lecNameInp = document.getElementById('lecName');
+const lecEmailInp = document.getElementById('lecEmail');
+const lecPasswordInp = document.getElementById('lecPassword');
+
+const lecLoginEmail = document.getElementById('lecLoginEmail');
+const lecLoginPassword = document.getElementById('lecLoginPassword');
+
+const signedAs = document.getElementById('signedAs');
+
+const roster = document.getElementById('roster');
+const rosterSearch = document.getElementById('rosterSearch');
+const refreshRoster = document.getElementById('refreshRoster');
+const importDemo = document.getElementById('importDemo');
+const clearRoster = document.getElementById('clearRoster');
+
+const createSessionBtn = document.getElementById('createSession');
+const courseName = document.getElementById('courseName');
+const roomName = document.getElementById('roomName');
+const startTime = document.getElementById('startTime');
+const endTime = document.getElementById('endTime');
+
+const qrcodeEl = document.getElementById('qrcode');
+const qrPayload = document.getElementById('qrPayload');
+const copyPayload = document.getElementById('copyPayload');
+const openScanTip = document.getElementById('openScanTip');
+
+const presentList = document.getElementById('presentList');
+const absentList = document.getElementById('absentList');
+const historyList = document.getElementById('historyList');
+
+const statTotal = document.getElementById('statTotal');
+const statPresent = document.getElementById('statPresent');
+const statAbsent = document.getElementById('statAbsent');
+
+const sessionInfo = document.getElementById('sessionInfo');
+const exportCsvBtn = document.getElementById('exportCsv');
+const endSessionBtn = document.getElementById('endSession');
+const tipModal = document.getElementById('tipModal');
+const closeTip = document.getElementById('closeTip');
+
+let qrInstance = null;
+
+/* -------------------------
+   Auth (simple localStorage)
+   ------------------------- */
+function getLecturers(){ return read('lecturers_v2'); }
+function saveLecturers(arr){ write('lecturers_v2', arr); }
+
+function currentLecturer(){ return readObj('current_lecturer_v2'); }
+function setCurrentLecturer(obj){ if(obj) writeObj('current_lecturer_v2', obj); else removeKey('current_lecturer_v2'); updateAuthUI(); }
+
+function updateAuthUI(){
+  const cur = currentLecturer();
+  if(cur){
+    signedAs.textContent = `${cur.name} · ${cur.email}`;
+    signoutBtn.style.display = 'inline-block';
+    signinBtn.style.display = 'none';
+    document.getElementById('loginForm').style.display = 'none';
+    document.getElementById('signupForm').style.display = 'none';
+  } else {
+    signedAs.textContent = '—';
+    signoutBtn.style.display = 'none';
+    signinBtn.style.display = 'inline-block';
+    document.getElementById('loginForm').style.display = '';
+    document.getElementById('signupForm').style.display = 'none';
+  }
+}
+updateAuthUI();
+
+showLogin.addEventListener('click', ()=>{ loginForm.style.display=''; signupForm.style.display='none'; signinBtn.style.display='inline-block'; });
+showSignup.addEventListener('click', ()=>{ signupForm.style.display=''; loginForm.style.display='none'; });
+
+registerBtn.addEventListener('click', ()=>{
+  const name = lecNameInp.value.trim(); const email = lecEmailInp.value.trim(); const pw = lecPasswordInp.value;
+  if(!name||!email||!pw){ alert('Fill all fields'); return; }
+  const lecturers = getLecturers();
+  if(lecturers.find(l=>l.email===email)){ alert('Account with this email already exists'); return; }
+  lecturers.push({name,email,password:pw});
+  saveLecturers(lecturers);
+  setCurrentLecturer({name,email});
+  lecNameInp.value=''; lecEmailInp.value=''; lecPasswordInp.value='';
+  alert('Account created and logged in');
+});
+
+signinBtn.addEventListener('click', ()=>{
+  const email = lecLoginEmail.value.trim(); const pw = lecLoginPassword.value;
+  const lecturers = getLecturers();
+  const found = lecturers.find(l=>l.email===email && l.password===pw);
+  if(!found){ alert('Invalid credentials'); return; }
+  setCurrentLecturer({name: found.name, email: found.email});
+  lecLoginEmail.value=''; lecLoginPassword.value='';
+});
+
+signoutBtn.addEventListener('click', ()=>{
+  if(!confirm('Sign out?')) return;
+  setCurrentLecturer(null);
+  alert('Signed out');
+});
+
+/* -------------------------
+   Roster management (students are shared with student page)
+   ------------------------- */
+function getStudents(){ return read(LS.students); }
+function saveStudents(arr){ write(LS.students, arr); }
+
+function seedDemoRoster(){
+  const sample = [
+    {name:'Alice Mwangi', email:'alice@uni.edu', reg:'REG-001'},
+    {name:'Brian Otieno', email:'brian@uni.edu', reg:'REG-002'},
+    {name:'Caroline A.', email:'caroline@uni.edu', reg:'REG-003'},
+    {name:'Daniel K', email:'daniel@uni.edu', reg:'REG-004'}
+  ];
+  write(LS.students, sample);
+  refreshAll();
+}
+
+importDemo.addEventListener('click', ()=>{
+  if(confirm('Seed demo students into roster?')) seedDemoRoster();
+});
+
+clearRoster.addEventListener('click', ()=>{
+  if(!confirm('Clear all registered students?')) return;
+  saveStudents([]);
+  refreshAll();
+});
+
+refreshRoster.addEventListener('click', ()=> renderRoster());
+
+rosterSearch.addEventListener('input', ()=> renderRoster(rosterSearch.value.trim()));
+
+function renderRoster(filter=''){
+  const students = getStudents();
+  const f = filter.toLowerCase();
+  roster.innerHTML = '';
+  if(!students.length){ roster.innerHTML = '<div class="tiny muted">No registered students</div>'; return; }
+  students.filter(s => !f || (s.name + ' ' + s.reg + ' ' + s.email).toLowerCase().includes(f))
+    .forEach(s=>{
+      const div = document.createElement('div'); div.className='student-item';
+      div.innerHTML = `<div><strong>${escape(s.name)}</strong><div class="student-meta">${escape(s.reg)} · <span class="muted">${escape(s.email)}</span></div></div>
+                       <div class="tiny muted">${attendanceCount(s.reg)} sessions</div>`;
+      roster.appendChild(div);
+    });
+}
+
+/* -------------------------
+   Session & QR logic
+   ------------------------- */
+function getSessions(){ return read(LS.sessions); }
+function saveSessions(arr){ write(LS.sessions, arr); }
+function getActiveSessionId(){ return readObj(LS.active) || null; }
+function setActiveSessionId(id){ localStorage.setItem(LS.active, JSON.stringify(id)); } // store as json to trigger storage reliably
+
+function createSession(){
+  const lecturer = currentLecturer();
+  if(!lecturer){ alert('Please sign in as a lecturer first'); return; }
+  const course = courseName.value.trim(); const room = roomName.value.trim();
+  const start = startTime.value; const end = endTime.value;
+  if(!course || !start || !end){ alert('Please provide course, start and end time'); return; }
+  if(start >= end){ if(!confirm('Start time is same/after end time. Continue?')) return; }
+
+  const sessions = getSessions();
+  const id = 'SESSION_' + Date.now();
+  const session = {
+    id, createdAt: new Date().toISOString(), lecturerEmail: lecturer.email,
+    lecturerName: lecturer.name, course, room, start, end, attendance: [] // attendance: { reg,name,email,timestamp }
+  };
+  sessions.unshift(session);
+  saveSessions(sessions);
+  setActiveSessionId(id);
+  renderQRCodeForSession(session);
+  refreshAll();
+  alert('Session created and QR generated.');
+}
+
+createSessionBtn.addEventListener('click', createSession);
+
+function renderQRCodeForSession(session){
+  qrcodeEl.innerHTML = ''; qrPayload.textContent = '';
+  const payload = JSON.stringify({ lecturerEmail: session.lecturerEmail, sessionId: session.id, course: session.course });
+  qrPayload.textContent = payload;
+  try { qrInstance = new QRCode(qrcodeEl, { text: payload, width: 170, height: 170, correctLevel: QRCode.CorrectLevel.H }); } catch(e){ qrcodeEl.innerHTML = 'QR error' }
+  // update session info
+  sessionInfo.textContent = `Active: ${session.id} • ${session.course} • ${new Date(session.createdAt).toLocaleString()}`;
+}
+
+copyPayload.addEventListener('click', ()=>{
+  const t = qrPayload.textContent || '';
+  if(!t) return alert('No payload generated yet');
+  navigator.clipboard?.writeText(t).then(()=> alert('Payload copied'), ()=> alert('Copy failed'));
+});
+
+openScanTip.addEventListener('click', ()=> { tipModal.style.display = 'flex'; });
+closeTip.addEventListener('click', ()=> { tipModal.style.display = 'none'; });
+
+/* -------------------------
+   Attendance rendering & CSV
+   ------------------------- */
+function refreshAll(){
+  renderRoster();
+  renderSessions();
+  renderActiveAttendance();
+  updateClock();
+}
+
+function renderSessions(){
+  const sessions = getSessions();
+  historyList.innerHTML = '';
+  if(!sessions.length){ historyList.innerHTML = '<div class="tiny muted">No sessions yet</div>'; return; }
+  sessions.forEach(s=>{
+    const div = document.createElement('div'); div.className='list-item';
+    div.innerHTML = `<div>
+      <strong>${s.course}</strong>
+      <div class="tiny muted">${s.id} • ${new Date(s.createdAt).toLocaleString()}</div>
+    </div>
+    <div style="text-align:right">
+      <div class="tiny muted">${s.attendance.length} present</div>
+      <div style="margin-top:8px"><button class="ghost small" onclick="viewSession('${s.id}')">View</button>
+      <button class="ghost small" onclick="deleteSession('${s.id}')">Delete</button></div>
+    </div>`;
+    historyList.appendChild(div);
+  });
+}
+
+function viewSession(id){
+  // set active to view in lists
+  setActiveSessionId(id);
+  renderActiveAttendance();
+  alert('Viewing session: ' + id);
+}
+
+function deleteSession(id){
+  if(!confirm('Delete session ' + id + '? This cannot be undone.')) return;
+  let sessions = getSessions();
+  sessions = sessions.filter(s=>s.id !== id);
+  saveSessions(sessions);
+  // if deleted active session, clear active
+  if(getActiveSessionId() === id) { localStorage.removeItem(LS.active); qrcodeEl.innerHTML=''; qrPayload.textContent=''; sessionInfo.textContent='No active session'; }
+  refreshAll();
+}
+
+function getActiveSession(){
+  const id = getActiveSessionId();
+  if(!id) return null;
+  const sessions = getSessions();
+  return sessions.find(s=>s.id === id) || null;
+}
+function renderActiveAttendance(){
+  const students = getStudents();
+  const session = getActiveSession();
+  // stats
+  statTotal.textContent = students.length;
+  const present = session ? (session.attendance || []).length : 0;
+  statPresent.textContent = present;
+  statAbsent.textContent = Math.max(0, students.length - present);
+
+  // present list
+  presentList.innerHTML = '';
+  if(!session || (session.attendance||[]).length === 0){
+    presentList.innerHTML = '<div class="tiny muted">No attendance yet</div>';
+  } else {
+    (session.attendance||[]).forEach(a=>{
+      const div = document.createElement('div'); div.className='list-item';
+      div.innerHTML = `<div><strong>${escape(a.name)}</strong><div class="tiny muted">${escape(a.reg)} · ${escape(a.email)}</div></div><div class="status-pres">Present</div>`;
+      presentList.appendChild(div);
+    });
+  }
+
+  // absent = registered minus present regs
+  absentList.innerHTML = '';
+  if(!students.length){ absentList.innerHTML = '<div class="tiny muted">No students registered</div>'; }
+  else {
+    const presentRegs = session ? (session.attendance||[]).map(a=>a.reg) : [];
+    const absents = students.filter(s=>!presentRegs.includes(s.reg));
+    if(!absents.length) absentList.innerHTML = '<div class="tiny muted">No absent students — all present</div>';
+    else absents.forEach(s=>{
+      const div = document.createElement('div'); div.className='list-item';
+      div.innerHTML = `<div><strong>${escape(s.name)}</strong><div class="tiny muted">${escape(s.reg)} · ${escape(s.email)}</div></div><div class="status-abs">Absent</div>`;
+      absentList.appendChild(div);
+    });
+  }
+
+  // update session info + QR if active
+  if(session){
+    sessionInfo.textContent = `Active: ${session.id} • ${session.course} • ${new Date(session.createdAt).toLocaleString()}`;
+    // if QR not shown for this session, (re)render QR
+    const qPayload = qrPayload.textContent || '';
+    if(!qPayload || !qPayload.includes(session.id)) renderQRCodeForSession(session);
+  } else {
+    sessionInfo.textContent = 'No active session';
+  }
+}
+
+// export CSV for active session (includes absent rows)
+exportCsvBtn.addEventListener('click', exportCsv);
+
+function exportCsv(){
+  const session = getActiveSession();
+  if(!session) return alert('No active session to export');
+  const students = getStudents();
+  const presentRecords = session.attendance || [];
+  const presentRegs = presentRecords.map(r => r.reg);
+  const rows = [];
+  rows.push(['Lecturer','Course','Session ID','Student Reg','Student Name','Student Email','Status','Timestamp']);
+  // present rows
+  presentRecords.forEach(r => rows.push([ session.lecturerName, session.course, session.id, r.reg, r.name, r.email, 'Present', r.timestamp ]));
+  // absent rows
+  students.filter(s => !presentRegs.includes(s.reg)).forEach(s => rows.push([ session.lecturerName, session.course, session.id, s.reg, s.name, s.email, 'Absent', '' ]));
+  // convert to csv
+  const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], {type: 'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = `${session.id}_attendance.csv`; a.click(); URL.revokeObjectURL(url);
+}
+
+/* -------------------------
+   End session
+   ------------------------- */
+endSessionBtn.addEventListener('click', ()=>{
+  const session = getActiveSession();
+  if(!session) return alert('No active session to end');
+  if(!confirm('End current session? Students will not be able to mark attendance for this session afterwards.')) return;
+  localStorage.removeItem(LS.active);
+  sessionInfo.textContent = 'No active session';
+  qrcodeEl.innerHTML = '';
+  qrPayload.textContent = '';
+  refreshAll();
+});
+
+/* -------------------------
+   Utility: when students scan, they will write into sessions_v2
+   Listen to storage events to update in real-time
+   ------------------------- */
+window.addEventListener('storage', (ev) => {
+  // when sessions change, refresh view
+  if(ev.key === LS.sessions || ev.key === LS.students || ev.key === LS.active) {
+    // small delay for race conditions
+    setTimeout(refreshAll, 100);
+  }
+});
+
+/* -------------------------
+   Extras: functions used by inline handlers
+   ------------------------- */
+function escape(s){ return String(s||''); }
+function attendanceCount(reg){
+  const sessions = getSessions();
+  let cnt = 0;
+  sessions.forEach(s => (s.attendance||[]).forEach(a => { if(a.reg === reg) cnt++; }));
+  return cnt;
+}
+
+/* -------------------------
+   Demo helpers and startup seed
+   ------------------------- */
+document.addEventListener('DOMContentLoaded', ()=> {
+  // on load, render roster and sessions
+  if(!localStorage.getItem('lecturer_demo_seeded')) {
+    // optional: create a default lecturer for quick testing
+    const lects = getLecturers();
+    if(!lects.length) {
+      lects.push({name:'Dr. Smith', email:'lecturer@uni.edu', password:'1234'});
+      saveLecturers(lects);
+    }
+    localStorage.setItem('lecturer_demo_seeded','1');
+  }
+  renderRoster();
+  refreshAll();
+});
+
+// seed demo roster (button)
+window.seedDemoRoster = seedDemoRoster;
+
+/* -------------------------
+   Buttons: open scan tip & copy
+   ------------------------- */
+copyPayload.addEventListener('click', ()=>{
+  const t = qrPayload.textContent;
+  if(!t) return alert('No QR payload yet');
+  navigator.clipboard?.writeText(t).then(()=> alert('Payload copied to clipboard'), ()=> alert('Copy failed'));
+});
+
+/* helper: when students write to sessions_v2, ensure we can read them easily */
+function getSessions(){ return read(LS.sessions) || []; }
+function saveSessions(arr){ write(LS.sessions, arr); }
+
+/* When student page marks attendance it must:
+   - find session by sessionId
+   - push attendance record {reg,name,email,timestamp}
+   - write sessions_v2 back to localStorage
+   Lecturer page listens for storage events and updates UI.
+*/
+
+/* small clock display for UI */
+function updateClock(){ document.getElementById('clock').textContent = new Date().toLocaleTimeString(); }
+setInterval(updateClock, 1000);
+
+/* Expose a couple functions globally so inline html can call them */
+window.viewSession = function(id){ viewSession(id); };
+window.deleteSession = function(id){ deleteSession(id); };
+
+</script>
+</body>
+</html>

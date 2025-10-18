@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Student — Scan & Submit Attendance</title>
+  <style>
+    :root{ --bg:#f8fafc; --card:#fff; --accent:#0b74de }
+    html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,Arial;background:var(--bg)}
+    .page{min-height:100%;display:flex;align-items:center;justify-content:center;padding:2rem}
+    .card{width:100%;max-width:560px;background:var(--card);padding:1.25rem;border-radius:10px;box-shadow:0 8px 24px rgba(2,6,23,0.06)}
+    h1{margin:0 0 .5rem 0;font-size:1.25rem}
+    .input{width:100%;padding:.65rem .75rem;border:1px solid #e6eef6;border-radius:8px}
+    .row{display:flex;gap:.5rem}
+    .actions{display:flex;gap:.5rem;margin-top:.75rem}
+    .btn{padding:.65rem .9rem;border-radius:8px;border:0;font-weight:600;background:var(--accent);color:#fff;cursor:pointer}
+    .note{margin-top:.75rem;color:#374151}
+    .small{font-size:.9rem;color:#6b7280}
+    .qrbox{border:1px dashed #dbeafe;padding:10px;border-radius:8px;margin-top:.5rem}
+  </style>
+  <!-- optionally include a lightweight QR scanner lib if desired (not bundled) -->
+</head>
+<body>
+  <div class="page">
+    <main class="card" role="main">
+      <h1>Student Scan & Submit</h1>
+      <p class="note">Scan the lecturer's QR code or paste the payload, then enter your details and submit.</p>
+
+      <div>
+        <label>QR payload (JSON)</label>
+        <textarea id="payload" class="input" rows="3" placeholder='{"lecturerEmail":"lect@uni.edu","sessionId":"SESSION_...","course":"Course name"}'></textarea>
+        <div class="small">Tip: If you scanned a QR elsewhere, paste the JSON payload here. If the payload is valid the session info below will be prefilled.</div>
+        <!-- Video preview for camera-based scanning (hidden until started) -->
+        <video id="qrVideo" style="width:100%;border-radius:8px;display:none;margin-top:.5rem" muted playsinline></video>
+      </div>
+
+      <div style="margin-top:.75rem" id="sessionInfoBox" aria-hidden="true">
+        <div class="small">Detected session</div>
+  <div id="detectedSession" class="qrbox small muted">No session detected yet</div>
+  <pre id="qrJson" class="qrbox" style="display:none;margin-top:.5rem;white-space:pre-wrap;word-break:break-word;"></pre>
+  <div id="payloadValidation" class="small" style="margin-top:.5rem;color:#b91c1c;display:none">A valid session JSON (with sessionId) is required before submitting.</div>
+      </div>
+
+      <form id="attendanceForm" autocomplete="on" style="margin-top:.75rem">
+        <div>
+          <label for="fullName">Full name</label>
+          <input id="fullName" name="fullName" class="input" required placeholder="Your full name" />
+        </div>
+        <div>
+          <label for="regNo">Registration number</label>
+          <input id="regNo" name="regNo" class="input" required placeholder="REG-12345" />
+        </div>
+        <div>
+          <label>Status</label>
+          <div class="row" style="margin-top:.5rem">
+            <label><input type="radio" name="status" value="present" checked /> Present</label>
+            <label><input type="radio" name="status" value="absent" /> Absent</label>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button id="scanBtn" type="button" class="btn" style="background:#0f1724">Use camera</button>
+          <button id="submitBtn" type="submit" class="btn" disabled>Submit</button>
+        </div>
+      </form>
+
+      <p class="note">Submissions will be sent to the server if available; otherwise they will be added to localStorage for the lecturer dashboard to pick up.</p>
+    </main>
+  </div>
+
+  <script type="module">
+  import QrScanner from 'https://unpkg.com/qr-scanner@1.4.2/qr-scanner.min.js';
+  // ensure worker path is set so the scanner works when loaded from CDN
+  QrScanner.WORKER_PATH = 'https://unpkg.com/qr-scanner@1.4.2/qr-scanner-worker.min.js';
+
+    // Helpers
+    function safeParse(s){ try { return JSON.parse(s); } catch(e){ return null } }
+    function readLS(key){ try{ return JSON.parse(localStorage.getItem(key) || 'null') } catch(e){ return null } }
+    function writeLS(key, val){ try{ localStorage.setItem(key, JSON.stringify(val)) } catch(e){} }
+
+    const payloadEl = document.getElementById('payload');
+    const detectedEl = document.getElementById('detectedSession');
+    const sessionInfoBox = document.getElementById('sessionInfoBox');
+  const qrJsonEl = document.getElementById('qrJson');
+  const scanBtn = document.getElementById('scanBtn');
+    const qrVideo = document.getElementById('qrVideo');
+    let qrScanner = null;
+  const submitBtn = document.getElementById('submitBtn');
+  const payloadValidation = document.getElementById('payloadValidation');
+
+    function updateDetected(){
+      const txt = payloadEl.value.trim();
+      const obj = safeParse(txt);
+      if(obj && obj.sessionId){
+        detectedEl.textContent = `${obj.course || '—'} • ${obj.sessionId} • ${obj.lecturerEmail || ''}`;
+        sessionInfoBox.setAttribute('aria-hidden','false');
+        // enable submit when we have a sessionId
+        if(submitBtn) submitBtn.disabled = false;
+        if(payloadValidation) payloadValidation.style.display = 'none';
+        return obj;
+      }
+      detectedEl.textContent = 'No session detected yet';
+      sessionInfoBox.setAttribute('aria-hidden','true');
+      qrJsonEl.style.display = 'none';
+      qrJsonEl.textContent = '';
+      if(submitBtn) submitBtn.disabled = true;
+      if(payloadValidation) payloadValidation.style.display = 'block';
+      return null;
+    }
+
+    payloadEl.addEventListener('input', updateDetected);
+
+    // Prefill from query param ?payload=...
+    (function(){
+      try{
+        const qp = new URLSearchParams(location.search).get('payload');
+        if(qp){
+          try{ payloadEl.value = decodeURIComponent(qp); } catch(e){ payloadEl.value = qp }
+          updateDetected();
+        }
+      }catch(e){}
+    })();
+
+    // Camera / clipboard scanning
+    scanBtn.addEventListener('click', async ()=>{
+      // toggle off
+      if(qrScanner){
+        try{ await qrScanner.stop(); }catch(e){}
+        try{ qrScanner.destroy(); }catch(e){}
+        qrScanner = null;
+        qrVideo.style.display = 'none';
+        scanBtn.textContent = 'Use camera';
+        return;
+      }
+
+      // try clipboard first (quick path)
+      try{
+        if(navigator.clipboard){
+          const text = await navigator.clipboard.readText();
+          if(text && text.trim()){
+            payloadEl.value = text.trim();
+            updateDetected();
+            const parsed = safeParse(text.trim());
+            if(parsed){
+              try{ qrJsonEl.textContent = JSON.stringify(parsed, null, 2); qrJsonEl.style.display = 'block'; }catch(e){ qrJsonEl.textContent = String(parsed); qrJsonEl.style.display = 'block'; }
+              return; // don't open camera if clipboard already had a valid payload
+            }
+          }
+        }
+      }catch(e){ /* ignore clipboard errors */ }
+
+      // start camera-based scanner
+      try{
+        // show video UI
+        qrVideo.style.display = 'block';
+        qrVideo.setAttribute('autoplay', '');
+        qrVideo.setAttribute('playsinline', '');
+
+        // prefer environment camera if available
+        let preferredCamera = undefined;
+        try{
+          if(await QrScanner.hasCamera()){
+            // try to select the back camera when possible
+            const cams = await QrScanner.listCameras(true);
+            const back = cams.find(c => /back|rear|environment/i.test(c.label || ''));
+            if(back) preferredCamera = back.id || back.deviceId || back.label;
+          }
+        }catch(e){ /* ignore camera listing errors */ }
+
+        qrScanner = new QrScanner(qrVideo, result => {
+          // normalize result
+          let payloadText = result;
+          // if the QR contains a URL with a payload param try to extract
+          try{
+            if(typeof payloadText === 'string' && /^https?:\/\//i.test(payloadText)){
+              try{
+                const u = new URL(payloadText);
+                if(u.searchParams.has('payload')){
+                  payloadText = decodeURIComponent(u.searchParams.get('payload'));
+                }
+              }catch(e){}
+            }
+          }catch(e){}
+
+          payloadEl.value = payloadText;
+          const parsed = safeParse(payloadText);
+          updateDetected();
+          if(parsed){
+            qrJsonEl.textContent = JSON.stringify(parsed, null, 2);
+            qrJsonEl.style.display = 'block';
+          } else {
+            qrJsonEl.textContent = String(payloadText);
+            qrJsonEl.style.display = 'block';
+          }
+
+          // stop scanner to avoid duplicate reads
+          try{ qrScanner.stop(); }catch(e){}
+          try{ qrScanner.destroy(); }catch(e){}
+          qrScanner = null;
+          qrVideo.style.display = 'none';
+          scanBtn.textContent = 'Use camera';
+        }, { highlightScanRegion: true, preferredCamera });
+
+        await qrScanner.start();
+        scanBtn.textContent = 'Stop camera';
+      }catch(err){
+        qrVideo.style.display='none';
+        try{ if(qrScanner){ qrScanner.destroy(); qrScanner = null } }catch(_){}
+        scanBtn.textContent='Use camera';
+        console.error('Camera start error', err);
+        alert('Camera access failed or not available on this device. Please ensure the page is served over HTTPS or try pasting the payload manually.');
+      }
+    });
+
+    // Submit
+    document.getElementById('attendanceForm').addEventListener('submit', function(e){
+      e.preventDefault();
+      if(qrScanner){ qrScanner.stop(); qrScanner.destroy(); qrScanner = null; qrVideo.style.display='none'; scanBtn.textContent='Use camera'; }
+
+      const name = (document.getElementById('fullName').value || '').trim();
+      const regNo = (document.getElementById('regNo').value || '').trim();
+      const statusEl = document.querySelector('input[name="status"]:checked');
+      const status = statusEl ? statusEl.value : 'present';
+      if(!name || !regNo){ alert('Please enter name and registration number'); return; }
+
+      const sessionPayload = safeParse(payloadEl.value.trim());
+      if(!sessionPayload || !sessionPayload.sessionId){
+        alert('A valid session payload (JSON with sessionId) is required to submit attendance.');
+        return;
+      }
+
+      const body = { name, regNo, status, ts: new Date().toISOString(), session: sessionPayload };
+
+      fetch('/api/attendance', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+      }).then(r => {
+        if(!r.ok) throw new Error('server error');
+        return r.json();
+      }).then(j => {
+        alert('Attendance submitted — thank you.');
+        document.getElementById('attendanceForm').reset();
+      }).catch(err => {
+        console.warn('API failed, falling back to localStorage', err);
+        try{
+          if(sessionPayload && sessionPayload.sessionId){
+            const sessions = readLS('sessions_v2') || [];
+            let s = sessions.find(x => x.id === sessionPayload.sessionId);
+            if(!s){
+              s = { id: sessionPayload.sessionId, createdAt: new Date().toISOString(), lecturerEmail: sessionPayload.lecturerEmail || '', lecturerName: '', course: sessionPayload.course || '', room: '', start: '', end: '', attendance: [] };
+              sessions.unshift(s);
+            }
+            s.attendance = s.attendance || [];
+            s.attendance.push({ reg: regNo, name, email: '', timestamp: new Date().toISOString(), status });
+            writeLS('sessions_v2', sessions);
+            const recs = readLS('attendanceRecords') || [];
+            recs.push({ id: Date.now().toString(36), name, regNo, status, ts: new Date().toISOString(), sessionId: sessionPayload.sessionId });
+            writeLS('attendanceRecords', recs);
+            alert('Attendance saved locally for offline demo.');
+            document.getElementById('attendanceForm').reset();
+            return;
+          }
+          const recs = readLS('attendanceRecords') || [];
+          recs.push({ id: Date.now().toString(36), name, regNo, status, ts: new Date().toISOString() });
+          writeLS('attendanceRecords', recs);
+          alert('Attendance saved locally (offline demo).');
+          document.getElementById('attendanceForm').reset();
+        }catch(e){ console.error(e); alert('Failed to save attendance locally.'); }
+      });
+    });
+  </script>
